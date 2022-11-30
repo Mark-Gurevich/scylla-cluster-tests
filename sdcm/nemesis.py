@@ -91,7 +91,7 @@ from sdcm.utils.common import (get_db_tables, generate_random_string,
                                update_certificates, reach_enospc_on_node, clean_enospc_on_node,
                                parse_nodetool_listsnapshots,
                                update_authenticator, ParallelObject,
-                               ParallelObjectResult, sleep_for_percent_of_duration)
+                               ParallelObjectResult, sleep_for_percent_of_duration, ParallelObjectException)
 from sdcm.utils.compaction_ops import CompactionOps, StartStopCompactionArgs
 from sdcm.utils.decorators import retrying, latency_calculator_decorator
 from sdcm.utils.decorators import timeout as timeout_decor
@@ -1832,11 +1832,20 @@ class Nemesis:  # pylint: disable=too-many-instance-attributes,too-many-public-m
     def disrupt_nodetool_cleanup(self):
         # This fix important when just user profile is run in the test and "keyspace1" doesn't exist.
         test_keyspaces = self.cluster.get_test_keyspaces()
-        for node in self.cluster.nodes:
+
+        # Inner disrupt function for ParallelObject
+        def _dis_nodetool_cleanup(node):
             InfoEvent('NodetoolCleanupMonkey %s' % node).publish()
             with adaptive_timeout(Operations.CLEANUP, node, timeout=HOUR_IN_SEC * 48):
                 for keyspace in test_keyspaces:
                     node.run_nodetool(sub_cmd="cleanup", args=keyspace)
+
+        threads = ParallelObject(self.cluster.nodes, num_workers=min(32, len(self.cluster.nodes)))
+        thread_results = threads.run(_dis_nodetool_cleanup, ignore_exceptions=True, unpack_objects=True)
+        if any(res for res in thread_results if res.exc):
+            self.log.error("Nodetool cleanup has failed", exc_info=ParallelObjectException(results=thread_results))
+        else:
+            self.log.info(f"All nodetool cleanup commands finished successfully. Results: {thread_results}")
 
     def _prepare_test_table(self, ks='keyspace1', table=None):
         ks_cfs = self.cluster.get_non_system_ks_cf_list(db_node=self.target_node)
