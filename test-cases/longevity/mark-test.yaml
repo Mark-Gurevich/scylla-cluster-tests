@@ -1,0 +1,34 @@
+test_duration: 5
+#stress_cmd: ["cassandra-stress write cl=ONE duration=1m -schema 'replication(factor=3) compaction(enabled=false)' -mode cql3 native -rate threads=2 -pop seq=1..10000"]
+#stress_cmd: [
+#"JVM_OPTION='-Xms8033M -Xmx8033M -Xmn400M' cassandra-stress user profile=/tmp/large_collections.yaml ops'(insert=3,read1=1,update1=1)' cl=ONE duration=1m -mode cql3 native -rate threads=1"
+#             ]
+
+n_loaders: 0
+n_monitor_nodes: 0
+n_db_nodes: 1
+
+instance_type_db: 'i4i.xlarge'
+
+nemesis_class_name: NoOpMonkey
+nemesis_interval: 1
+nemesis_filter_seeds: false
+
+
+user_prefix: 'mark-testing'
+hinted_handoff: 'disabled'
+
+
+scylla_version: 'master:latest'
+use_mgmt: false
+
+monitor_swap_size: 0
+post_behavior_db_nodes: "keep"
+post_behavior_loader_nodes: "keep"
+post_behavior_monitor_nodes: "keep"
+
+run_fullscan: ['{"mode": "aggregate", "ks_cf": "keyspace1.standard1", "interval": 1}']
+nemesis_seed: '111'
+
+#append_scylla_yaml: |
+#  compaction_collection_items_count_warning_threshold: 3000
